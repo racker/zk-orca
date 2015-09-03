@@ -1,0 +1,13 @@
+zookeeper:
+  image: jplock/zookeeper:3.4.6
+  ports:
+    - "2181:2181"
+    - "2888:2888"
+    - "3888:3888"
+test:
+  build: .
+  volumes:
+    - ./:/src
+  links:
+    - zookeeper:zookeeper
+  command: npm run test
