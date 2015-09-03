@@ -32,11 +32,22 @@ limitations under the License.
 
 /**
  * @example
+
+/connections/:zoneName/:agentId/:connectionGuid
+
 var zkorca = require('zk-orca');
-var cxn = zkorca.getCxn({ urls: ['127.0.0.1:2181']});
+var options = {
+  urls: ['127.0.0.1:2181'],
+  quorum: 3,
+  change_trigger: 0
+};
+var cxn = zkorca.getCxn(options);
 cxn.monitor('zoneName')
 cxn.on('zone:zoneName', onZoneChange);
- */
+cxn.addNode('zoneName', 'agentId', 'connection guid');
+cxn.removeNode('zoneName', 'agentId', 'connection guid');
+
+*/
 
 var util = require('util');
 var events = require('events');
