@@ -32,15 +32,10 @@ limitations under the License.
 
 /**
  * @example
-var zkultra = require('zk-ultralight');
-var cxn = zkorca.getCxn(['127.0.0.1:2181']);
-function performActionWithLock(callback) {
-  async.series([
-    cxn.lock.bind(cxn, '/critical/section', 'vroom'),
-    performAction,
-    cxn.unlock.bind(cxn, '/critical/section')
-  ], callback);
-}
+var zkorca = require('zk-orca');
+var cxn = zkorca.getCxn({ urls: ['127.0.0.1:2181']});
+cxn.monitor('zoneName')
+cxn.on('zone:zoneName', onZoneChange);
  */
 
 var util = require('util');
