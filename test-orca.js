@@ -18,6 +18,7 @@ var test = require('tape');
 var async = require('async');
 var logmagic = require('logmagic');
 var zkorca = require('./orca');
+var _ = require('underscore');
 
 if (process.env.TRACE) {
   logmagic.route("__root__", logmagic.TRACE1, "console");
@@ -25,6 +26,7 @@ if (process.env.TRACE) {
 
 var URLS = ['127.0.0.1:2181'];
 var BAD_URLS = ['127.0.0.1:666'];
+var DEFAULT_NAME = 'nameA';
 
 if (process.env.ZOOKEEPER_PORT_2181_TCP_ADDR && process.env.ZOOKEEPER_PORT_2181_TCP_PORT) {
   URLS = [process.env.ZOOKEEPER_PORT_2181_TCP_ADDR + ":" + process.env.ZOOKEEPER_PORT_2181_TCP_PORT];
@@ -32,10 +34,30 @@ if (process.env.ZOOKEEPER_PORT_2181_TCP_ADDR && process.env.ZOOKEEPER_PORT_2181_
   URLS = [process.env.ZK];
 }
 
-test('test options', function(t) {
-  var cxn = zkorca.getCxn({urls: URLS});
-  console.log(cxn);
-  t.end();
+function defaultOptions() {
+  return {
+    urls: URLS,
+    name: DEFAULT_NAME
+  }
+}
+
+test('test monitor', function(t) {
+  var cxn = zkorca.getCxn(defaultOptions());
+  cxn.monitor('acOne', 'testZone', function(err) {
+    t.ifError(err);
+  });
+  cxn.on('error', function(err) {
+    t.ifError(err);
+  });
+  cxn.on('zone:acOne:testZone', function(event) {
+    console.log(event);
+    t.end();
+  });
+  _.delay(function() {
+    cxn.addNode('acOne', 'testZone', 'agentId1', 'guid', function(err) {
+      t.ifError(err);
+    });
+  }, 100);
 });
 
 test('cleanup', function(t) {

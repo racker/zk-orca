@@ -15,25 +15,9 @@ limitations under the License.
 */
 
 /**
- * @description
- *
- * Module interface:
- * - ZkCXN = exports.getCxn(zkUrls, cxnTimeout)
- * - exports.shutdown(callback)
- *
- * ZkCxn:
- * - lock(name, txnId, callback)
- * - unlock(name, callback)
- *
- * Public methods on ZkCxn you probably do not need to call:
- * - onConnection(callback)
- * - close(callback)
- */
-
-/**
  * @example
 
-/connections/:zoneName/:agentId/:connectionGuid
+/connections/:accountKey/:zoneName/:agentId/:connectionGuid
 
 var zkorca = require('zk-orca');
 var options = {
@@ -42,38 +26,47 @@ var options = {
   change_trigger: 0
 };
 var cxn = zkorca.getCxn(options);
-cxn.monitor('zoneName')
-cxn.on('zone:zoneName', onZoneChange);
-cxn.addNode('zoneName', 'agentId', 'connection guid');
-cxn.removeNode('zoneName', 'agentId', 'connection guid');
+cxn.monitor('accountKey', 'zoneName')
+cxn.on('zone:accountKey:zoneName', onZoneChange);
+cxn.addNode('accountKey', 'zoneName', 'agentId', 'connection guid');
+cxn.removeNode('accountKey', 'zoneName', 'agentId', 'connection guid');
 
 */
 
 var util = require('util');
 var events = require('events');
+var sprintf = require('sprintf').sprintf;
 var async = require('async');
 var _ = require('underscore');
-var zkUltraCxn = require('zk-ultralight').getCxn;
+var zkUltra = require('zk-ultralight');
+var zookeeper = require('node-zookeeper-client');
+
 var log = require('logmagic').local('zk-ultralight');
 
-
-// used for onConnection callbacks which is both lock and unlock
 var DEFAULT_TIMEOUT = 16000;
 
 var cxns = {}; // urls -> ZkCxn
 
 
-exports.getCxn = function getCxn(options) {
-  var urls = options.urls.join(',');
-  options = _.extend(options, { urls: urls });
+/**
+ *
+ * @param opts
+ * @returns {*}
+ */
+exports.getCxn = function getCxn(opts) {
   log.trace1('getCxn');
+  var urls = opts.urls.join(',');
   if (!cxns[urls]) {
-    cxns[urls] = new ZkOrca(options);
+    cxns[urls] = new ZkOrca(opts);
   }
   return cxns[urls];
 };
 
 
+/**
+ *
+ * @param callback
+ */
 exports.shutdown = function shutdown(callback) {
   log.trace1('shutdown');
   var toClose = _.values(cxns);
@@ -89,19 +82,84 @@ exports.shutdown = function shutdown(callback) {
 };
 
 
-/*
+/**
+ *
+ * @param opts
  * @constructor
- * @params {String} urls A comma-delimited array of <ZK host:port>s.
- * @params {?Number} timeout A timeout.
  */
 function ZkOrca(opts) {
   opts = opts || {};
-  this._urls = opts.urls;
+  this._urls = opts.urls || [];
   this._timeout = opts.timeout || DEFAULT_TIMEOUT;
+  this._name = opts.name || 'undefined_name';
+  this._zku = zkUltra.getCxn(this._urls, this._timeout);
 }
+util.inherits(ZkOrca, events.EventEmitter);
 
 
+/**
+ * Monitor a subtree by accountKey and zoneName.
+ * @param accountKey{String} the account key.
+ * @param zoneName{String} the zone name.
+ */
+ZkOrca.prototype.monitor = function(accountKey, zoneName, callback) {
+  var self = this,
+      path = sprintf('/%s/%s/%s', this._name, accountKey, zoneName);
+  self._zku.onConnection(function(err) {
+    if (err) {
+      log.trace1('Error while waiting for connection', { err: err });
+      callback(err);
+      return;
+    }
+    async.auto({
+      'path': function(callback) {
+         if (self._zku._cxnState !== self._zku.cxnStates.CONNECTED) {
+           log.trace1('Error observed on path creation', { error: err });
+           return;
+         }
+         try {
+           self._zku._zk.mkdirp(path, callback);
+         } catch (err) {
+           callback(err);
+         }
+      },
+      'watch': ['path', function(callback) {
+        log.trace1('Starting watch', { accountKey: accountKey, zoneName: zoneName });
+        self._zku._zk.getChildren(path, function(event) {
+          self.emit('zone:' + accountKey + ':' + zoneName, event);
+        }, callback);
+      }]
+    });
+  }, callback);
+};
+
+
+/**
+ *
+ * @param accountKey
+ * @param zoneName
+ * @param agentId
+ * @param connectionGuid
+ */
+ZkOrca.prototype.addNode = function(accountKey, zoneName, agentId, connGuid, callback) {
+  var self = this,
+      path = sprintf('/%s/%s/%s/' + agentId + ':' + connGuid, this._name, accountKey, zoneName);
+  self._zku.onConnection(function(err) {
+    if (err) {
+      log.trace1('Error while waiting for connection', { err: err });
+      callback(err);
+      return;
+    }
+    self._zku._zk.create(path, null, zookeeper.CreateMode.EPHEMERAL, callback);
+  });
+};
+
+
+/**
+ *
+ * @param callback
+ */
 ZkOrca.prototype.close = function(callback) {
-  _.delay(callback, 0);
+  this._zku.close(callback);
 };
 
