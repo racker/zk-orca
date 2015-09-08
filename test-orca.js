@@ -41,7 +41,7 @@ function defaultOptions() {
   }
 }
 
-test('test monitor', function(t) {
+test('test monitor zone change', function(t) {
   var cxn = zkorca.getCxn(defaultOptions());
   cxn.monitor('acOne', 'testZone', function(err) {
     t.ifError(err);

@@ -17,7 +17,7 @@ limitations under the License.
 /**
  * @example
 
-/connections/:accountKey/:zoneName/:agentId/:connectionGuid
+/:name/:accountKey/:zoneName/connections/agentId/connectionGuid
 
 var zkorca = require('zk-orca');
 var options = {
@@ -33,18 +33,17 @@ cxn.removeNode('accountKey', 'zoneName', 'agentId', 'connection guid');
 
 */
 
-var util = require('util');
-var events = require('events');
-var sprintf = require('sprintf').sprintf;
-var async = require('async');
 var _ = require('underscore');
+var async = require('async');
+var events = require('events');
+var log = require('logmagic').local('zk-ultralight');
+var path = require('path');
+var sprintf = require('sprintf').sprintf;
+var util = require('util');
 var zkUltra = require('zk-ultralight');
 var zookeeper = require('node-zookeeper-client');
 
-var log = require('logmagic').local('zk-ultralight');
-
 var DEFAULT_TIMEOUT = 16000;
-
 var cxns = {}; // urls -> ZkCxn
 
 
@@ -104,10 +103,10 @@ util.inherits(ZkOrca, events.EventEmitter);
  */
 ZkOrca.prototype.monitor = function(accountKey, zoneName, callback) {
   var self = this,
-      path = sprintf('/%s/%s/%s', this._name, accountKey, zoneName);
+      path = sprintf('/%s/%s/%s/connections', this._name, accountKey, zoneName);
   self._zku.onConnection(function(err) {
     if (err) {
-      log.trace1('Error while waiting for connection', { err: err });
+      log.trace1('Error while waiting for connection (monitor)', { err: err });
       callback(err);
       return;
     }
@@ -143,14 +142,19 @@ ZkOrca.prototype.monitor = function(accountKey, zoneName, callback) {
  */
 ZkOrca.prototype.addNode = function(accountKey, zoneName, agentId, connGuid, callback) {
   var self = this,
-      path = sprintf('/%s/%s/%s/' + agentId + ':' + connGuid, this._name, accountKey, zoneName);
+      connPath = sprintf('/%s/%s/%s/connections/%s-%s', this._name, accountKey, zoneName, agentId, connGuid);
   self._zku.onConnection(function(err) {
     if (err) {
-      log.trace1('Error while waiting for connection', { err: err });
+      log.trace1('Error while waiting for connection (monitor)', { err: err });
       callback(err);
       return;
     }
-    self._zku._zk.create(path, null, zookeeper.CreateMode.EPHEMERAL, callback);
+    async.auto({
+      'path': function(callback) {
+        log.trace1('Creating node', { path: connPath });
+        self._zku._zk.create(connPath, null, zookeeper.CreateMode.EPHEMERAL, callback);
+      }
+    }, callback);
   });
 };
 
