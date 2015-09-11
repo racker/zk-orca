@@ -170,6 +170,12 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
       readyPath = sprintf('%s/ready', barrierPath),
       myPath = sprintf('%s/%s', barrierPath, uuid.v4());
 
+  function filterChildren(children) {
+    return _.filter(children, function(child) {
+      return child !== 'ready';
+    });
+  }
+
   log.trace1('Registering double barrier', { myPath: myPath });
 
   function onConnection(err) {
@@ -186,10 +192,12 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
           if (found) { return callback(null, false); }
           self._zku._zk.getChildren(barrierPath, function(err, children) {
             if (err) { return callback(err); }
+            children = filterChildren(children);
             count = children.length;
             if (count < clientCount) {
               setTimeout(0, callback, count < clientCount);
             } else {
+              found = true;
               callback(null, count < clientCount);
             }
           });
@@ -197,6 +205,7 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
         function(callback) {
           self._zku._zk.getChildren(barrierPath, function(err, children) {
             if (err) { return callback(err); }
+            children = filterChildren(children);
             found = children.length == clientCount;
             callback();
           });
