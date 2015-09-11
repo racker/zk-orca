@@ -17,6 +17,8 @@ limitations under the License.
 var test = require('tape');
 var async = require('async');
 var logmagic = require('logmagic');
+var longjohn = require('longjohn');
+var randomstring = require('randomstring');
 var zkorca = require('./orca');
 var _ = require('underscore');
 
@@ -60,7 +62,12 @@ function defaultOptions() {
 //  }, 100);
 //});
 
-test('double barrier', function(t) {
+function genDoubleBarrierKey(prefix) {
+  prefix = prefix || 'double-barrier-';
+  return '/' + prefix + randomstring.generate(8);
+}
+
+test('double barrier (2 nodes, create sync)', function(t) {
   var cxn = zkorca.getCxn(defaultOptions()),
       barrierEntryCount = 2,
       count = barrierEntryCount;
@@ -73,7 +80,59 @@ test('double barrier', function(t) {
     }
   }
 
-  _.times(barrierEntryCount, cxn._doubleBarrierEnter.bind(cxn, '/double-barrier-test4', barrierEntryCount, -1, done));
+  _.times(barrierEntryCount, cxn._doubleBarrierEnter.bind(cxn, genDoubleBarrierKey(), barrierEntryCount, -1, done));
+});
+
+test('double barrier (3 nodes, ordered)', function(t) {
+  var barrierEntryCount = 3,
+      count = barrierEntryCount,
+      key = genDoubleBarrierKey();
+  function done(err) {
+    t.ifError(err);
+    count--;
+    console.log(count);
+    if (count == 0) {
+      t.end();
+    }
+  }
+  setTimeout(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
+  }, 100);
+  setTimeout(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
+  }, 200);
+  setTimeout(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
+  }, 300);
+});
+
+test('double barrier (3 nodes, random)', function(t) {
+  var barrierEntryCount = 3,
+      count = barrierEntryCount,
+      key = genDoubleBarrierKey();
+  function done(err) {
+    t.ifError(err);
+    count--;
+    console.log(count);
+    if (count == 0) {
+      t.end();
+    }
+  }
+  setTimeout(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
+  }, _.random(0, 100));
+  setTimeout(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
+  }, _.random(0, 100));
+  setTimeout(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
+  }, _.random(0, 100));
 });
 
 test('cleanup', function(t) {
