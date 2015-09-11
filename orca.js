@@ -39,6 +39,7 @@ var events = require('events');
 var log = require('logmagic').local('zk-ultralight');
 var path = require('path');
 var sprintf = require('sprintf').sprintf;
+var uuid = require('uuid');
 var util = require('util');
 var zkUltra = require('zk-ultralight');
 var zookeeper = require('node-zookeeper-client');
@@ -133,6 +134,11 @@ ZkOrca.prototype.monitor = function(accountKey, zoneName, callback) {
 };
 
 
+ZkOrca.prototype._basePath = function(accountKey, zoneName) {
+  return sprintf('/%s/%s', accountKey, zoneName);
+};
+
+
 /**
  *
  * @param accountKey
@@ -142,7 +148,7 @@ ZkOrca.prototype.monitor = function(accountKey, zoneName, callback) {
  */
 ZkOrca.prototype.addNode = function(accountKey, zoneName, agentId, connGuid, callback) {
   var self = this,
-      connPath = sprintf('/%s/%s/%s/connections/%s-%s', this._name, accountKey, zoneName, agentId, connGuid);
+      connPath = sprintf('%s/connections/%s-%s', self._basePath(accountKey, zoneName), agentId, connGuid);
   self._zku.onConnection(function(err) {
     if (err) {
       log.trace1('Error while waiting for connection (monitor)', { err: err });
@@ -156,6 +162,89 @@ ZkOrca.prototype.addNode = function(accountKey, zoneName, agentId, connGuid, cal
       }
     }, callback);
   });
+};
+
+
+ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeout, callback) {
+  var self = this,
+      readyPath = sprintf('%s/ready', barrierPath),
+      myPath = sprintf('%s/%s', barrierPath, uuid.v4());
+
+  log.trace1('Registering double barrier', { myPath: myPath });
+
+  function onConnection(err) {
+    if (err) {
+      log.trace1('Error while waiting for connection (doubleBarrier)', { err: err });
+      callback(err);
+      return;
+    }
+    function internalEnter() {
+      var count = 0,
+          found = false;
+      async.during(
+        function(callback) {
+          if (found) { return callback(null, false); }
+          self._zku._zk.getChildren(barrierPath, function(err, children) {
+            if (err) { return callback(err); }
+            count = children.length;
+            if (count < clientCount) {
+              setTimeout(0, callback, count < clientCount);
+            } else {
+              callback(null, count < clientCount);
+            }
+          });
+        },
+        function(callback) {
+          self._zku._zk.getChildren(barrierPath, function(err, children) {
+            if (err) { return callback(err); }
+            found = children.length == clientCount;
+            callback();
+          });
+        }, function(err) {
+        if (err) {
+          callback(err);
+          return;
+        }
+        self._zku._zk.create(readyPath, null, zookeeper.CreateMode.EPHEMERAL, function(err) {
+          if (err) {
+            if (err.name !== 'NODE_EXISTS') {
+              callback(err);
+            }
+          }
+          log.trace1('created ready node (doubleBarrier)');
+          callback();
+        });
+      });
+    }
+    function pathExists(callback) {
+      self._zku._zk.mkdirp(barrierPath, callback);
+    }
+    function checkForReadyPath(callback) {
+      self._zku._zk.exists(readyPath, callback);
+    }
+    function register(callback) {
+      self._zku._zk.create(myPath, null, zookeeper.CreateMode.EPHEMERAL, callback);
+    }
+    self._zku._zk.exists(readyPath, function(err, stat) {
+      if (err) {
+        return callback(err);
+      }
+      if (stat) {
+        return callback();
+      }
+      async.auto({
+        'pathExists': pathExists,
+        'readyPath': ['pathExists', checkForReadyPath],
+        'register': ['readyPath', register],
+        'internal': ['register', function(callback) {
+          internalEnter();
+          callback();
+        }]
+      });
+    });
+  }
+  self._zku.onConnection(onConnection);
+  return myPath;
 };
 
 

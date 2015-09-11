@@ -41,27 +41,44 @@ function defaultOptions() {
   }
 }
 
-test('test monitor zone change', function(t) {
-  var cxn = zkorca.getCxn(defaultOptions());
-  cxn.monitor('acOne', 'testZone', function(err) {
+//test('test monitor zone change', function(t) {
+//  var cxn = zkorca.getCxn(defaultOptions());
+//  cxn.monitor('acOne', 'testZone', function(err) {
+//    t.ifError(err);
+//  });
+//  cxn.on('error', function(err) {
+//    t.ifError(err);
+//  });
+//  cxn.on('zone:acOne:testZone', function(event) {
+//    console.log(event);
+//    t.end();
+//  });
+//  _.delay(function() {
+//    cxn.addNode('acOne', 'testZone', 'agentId1', 'guid', function(err) {
+//      t.ifError(err);
+//    });
+//  }, 100);
+//});
+
+test('double barrier', function(t) {
+  var cxn = zkorca.getCxn(defaultOptions()),
+      barrierEntryCount = 2,
+      count = barrierEntryCount;
+
+  function done(err) {
     t.ifError(err);
-  });
-  cxn.on('error', function(err) {
-    t.ifError(err);
-  });
-  cxn.on('zone:acOne:testZone', function(event) {
-    console.log(event);
-    t.end();
-  });
-  _.delay(function() {
-    cxn.addNode('acOne', 'testZone', 'agentId1', 'guid', function(err) {
-      t.ifError(err);
-    });
-  }, 100);
+    count--;
+    if (count == 0) {
+      t.end();
+    }
+  }
+
+  _.times(barrierEntryCount, cxn._doubleBarrierEnter.bind(cxn, '/double-barrier-test4', barrierEntryCount, -1, done));
 });
 
 test('cleanup', function(t) {
-  zkorca.shutdown();
-  t.end();
+  zkorca.shutdown(function() {
+    t.end();
+  });
 });
 
