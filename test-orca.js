@@ -135,6 +135,26 @@ test('double barrier (3 nodes, random)', function(t) {
   }, _.random(0, 100));
 });
 
+test('double barrier (random nodes [10-100], random)', function(t) {
+  var barrierEntryCount = _.random(10, 100),
+      count = barrierEntryCount,
+      key = genDoubleBarrierKey();
+  function done(err) {
+    t.ifError(err);
+    count--;
+    console.log(count);
+    if (count == 0) {
+      t.end();
+    }
+  }
+  _.times(barrierEntryCount, function() {
+    setTimeout(function() {
+      var cxn = zkorca.getCxn(defaultOptions());
+      cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
+    }, _.random(0, 100));
+  });
+});
+
 test('cleanup', function(t) {
   zkorca.shutdown(function() {
     t.end();

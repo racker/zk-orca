@@ -200,7 +200,7 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
     function internalEnter() {
       function watcher(event) {
         if (event.name === 'NODE_CHILDREN_CHANGED') {
-          setImmediate(internalEnter.bind(self));
+          _.delay(internalEnter.bind(self), 0);
         }
       }
       if (ready) { return; }
