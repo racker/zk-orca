@@ -94,15 +94,15 @@ test('double barrier (3 nodes, ordered)', function(t) {
       t.end();
     }
   }
-  setTimeout(function() {
+  _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
     cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
   }, 100);
-  setTimeout(function() {
+  _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
     cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
   }, 200);
-  setTimeout(function() {
+  _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
     cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
   }, 300);
@@ -119,15 +119,15 @@ test('double barrier (3 nodes, same time)', function(t) {
       t.end();
     }
   }
-  setTimeout(function() {
+  _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
     cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
   }, 0);
-  setTimeout(function() {
+  _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
     cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
   }, 0);
-  setTimeout(function() {
+  _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
     cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
   }, 0);
@@ -144,15 +144,15 @@ test('double barrier (3 nodes, random)', function(t) {
       t.end();
     }
   }
-  setTimeout(function() {
+  _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
     cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
   }, _.random(0, 100));
-  setTimeout(function() {
+  _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
     cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
   }, _.random(0, 100));
-  setTimeout(function() {
+  _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
     cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
   }, _.random(0, 100));
@@ -170,11 +170,45 @@ test('double barrier (random nodes [10-100], random)', function(t) {
     }
   }
   _.times(barrierEntryCount, function() {
-    setTimeout(function() {
+    _.delay(function() {
       var cxn = zkorca.getCxn(defaultOptions());
       cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
     }, _.random(0, 100));
   });
+});
+
+test('double barrier leave', function(t) {
+  var barrierEntryCount = 3,
+      count = barrierEntryCount,
+      key = genDoubleBarrierKey();
+  function done(err) {
+    t.ifError(err, 'make sure error is nil');
+    count--;
+    if (count == 0) {
+      t.end();
+    }
+  }
+  _.delay(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    var path = cxn._doubleBarrierEnter(key, barrierEntryCount, -1, function (err) {
+      t.ifError(err, 'make sure error is nil');
+      cxn._doubleBarrierLeave(path, done);
+    });
+  }, _.random(0, 100));
+  _.delay(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    var path = cxn._doubleBarrierEnter(key, barrierEntryCount, -1, function (err) {
+      t.ifError(err, 'make sure error is nil');
+      cxn._doubleBarrierLeave(path, done);
+    });
+  }, _.random(0, 100));
+  _.delay(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    var path = cxn._doubleBarrierEnter(key, barrierEntryCount, -1, function(err) {
+      t.ifError(err, 'make sure error is nil');
+      cxn._doubleBarrierLeave(path, done);
+    });
+  }, _.random(0, 100));
 });
 
 test('cleanup', function(t) {

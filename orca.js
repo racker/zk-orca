@@ -244,6 +244,26 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
 };
 
 
+ZkOrca.prototype._doubleBarrierLeave = function(path, callback) {
+  var self = this;
+  function onConnection(err) {
+    if (err) {
+      log.trace1('Error while waiting for connection (doubleBarrier)', {err: err});
+      callback(err);
+      return;
+    }
+    self._zku._zk.exists(path, function(err, stat) {
+      if (err) {
+        callback(err);
+        return;
+      }
+      self._zku._zk.remove(path, -1, callback);
+    });
+  }
+  self._zku.onConnection(onConnection);
+};
+
+
 /**
  *
  * @param callback
