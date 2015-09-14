@@ -90,7 +90,6 @@ test('double barrier (3 nodes, ordered)', function(t) {
   function done(err) {
     t.ifError(err);
     count--;
-    console.log(count);
     if (count == 0) {
       t.end();
     }
@@ -109,6 +108,31 @@ test('double barrier (3 nodes, ordered)', function(t) {
   }, 300);
 });
 
+test('double barrier (3 nodes, same time)', function(t) {
+  var barrierEntryCount = 3,
+      count = barrierEntryCount,
+      key = genDoubleBarrierKey();
+  function done(err) {
+    t.ifError(err);
+    count--;
+    if (count == 0) {
+      t.end();
+    }
+  }
+  setTimeout(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
+  }, 0);
+  setTimeout(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
+  }, 0);
+  setTimeout(function() {
+    var cxn = zkorca.getCxn(defaultOptions());
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, done);
+  }, 0);
+});
+
 test('double barrier (3 nodes, random)', function(t) {
   var barrierEntryCount = 3,
       count = barrierEntryCount,
@@ -116,7 +140,6 @@ test('double barrier (3 nodes, random)', function(t) {
   function done(err) {
     t.ifError(err);
     count--;
-    console.log(count);
     if (count == 0) {
       t.end();
     }
@@ -142,7 +165,6 @@ test('double barrier (random nodes [10-100], random)', function(t) {
   function done(err) {
     t.ifError(err);
     count--;
-    console.log(count);
     if (count == 0) {
       t.end();
     }

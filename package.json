@@ -11,7 +11,7 @@
   ],
   "homepage": "",
   "scripts": {
-    "lint": "eslint orca.js",
+    "lint": "eslint orca.js test-orca.js",
     "test": "node ./test-orca.js",
     "coverage": "istanbul cover test-orca.js"
   },
