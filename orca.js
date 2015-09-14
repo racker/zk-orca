@@ -48,6 +48,14 @@ var DEFAULT_TIMEOUT = 16000;
 var cxns = {}; // urls -> ZkCxn
 
 
+function TimeoutException() {
+  Error.call(this);
+  this.message = 'timeout';
+}
+util.inherits(TimeoutException, Error);
+exports.TimeoutException = TimeoutException;
+
+
 /**
  *
  * @param opts
@@ -169,7 +177,17 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
   var self = this,
       readyPath = sprintf('%s/ready', barrierPath),
       myPath = sprintf('%s/%s', barrierPath, uuid.v4()),
-      ready = false;
+      ready = false,
+      timeoutTimer;
+
+  callback = _.once(callback);
+
+  if (timeoutTimer > 0) {
+    timeoutTimer = setTimeout(function() {
+      ready = true;
+      callback(new TimeoutException());
+    }, timeout);
+  }
 
   function filterChildren(children) {
     return _.filter(children, function(child) {
@@ -184,6 +202,7 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
           return callback(err);
         }
       }
+      if (timeoutTimer) clearTimeout(timeoutTimer);
       log.trace1('created ready node (doubleBarrier)');
       callback();
     });
