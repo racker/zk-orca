@@ -190,25 +190,25 @@ test('double barrier leave', function(t) {
   }
   _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
-    var path = cxn._doubleBarrierEnter(key, barrierEntryCount, -1, function (err) {
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, function (err, path) {
       t.ifError(err, 'make sure error is nil');
       cxn._doubleBarrierLeave(path, done);
     });
   }, _.random(0, 100));
   _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
-    var path = cxn._doubleBarrierEnter(key, barrierEntryCount, -1, function (err) {
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, function (err, path) {
       t.ifError(err, 'make sure error is nil');
       cxn._doubleBarrierLeave(path, done);
     });
   }, _.random(0, 100));
   _.delay(function() {
     var cxn = zkorca.getCxn(defaultOptions());
-    var path = cxn._doubleBarrierEnter(key, barrierEntryCount, -1, function(err) {
+    cxn._doubleBarrierEnter(key, barrierEntryCount, -1, function(err, path) {
       t.ifError(err, 'make sure error is nil');
       cxn._doubleBarrierLeave(path, done);
     });
-  }, _.random(0, 100));
+  }, _.random(0, 20));
 });
 
 test('cleanup', function(t) {

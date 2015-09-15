@@ -176,7 +176,7 @@ ZkOrca.prototype.addNode = function(accountKey, zoneName, agentId, connGuid, cal
 ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeout, callback) {
   var self = this,
       readyPath = sprintf('%s/ready', barrierPath),
-      myPath = sprintf('%s/%s', barrierPath, uuid.v4()),
+      myPath = sprintf('%s/%s-', barrierPath, uuid.v4()),
       ready = false,
       timeoutTimer;
 
@@ -195,19 +195,6 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
     });
   }
 
-  function createReady(callback) {
-    self._zku._zk.create(readyPath, null, zookeeper.CreateMode.EPHEMERAL, function(err) {
-      if (err) {
-        if (err.name !== 'NODE_EXISTS') {
-          return callback(err);
-        }
-      }
-      if (timeoutTimer) clearTimeout(timeoutTimer);
-      log.trace1('created ready node (doubleBarrier)');
-      callback();
-    });
-  }
-
   log.trace1('Registering double barrier', { myPath: myPath });
 
   function onConnection(err) {
@@ -216,18 +203,34 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
       callback(err);
       return;
     }
-    function internalEnter() {
+    function internalEnter(path) {
       function watcher(event) {
         if (event.name === 'NODE_CHILDREN_CHANGED') {
-          _.delay(internalEnter.bind(self), 0);
+          _.delay(internalEnter.bind(self), 0, path);
         }
       }
-      if (ready) { return; }
+      if (ready) {
+        return;
+      }
       self._zku._zk.getChildren(barrierPath, watcher, function(err, children) {
-        if (err) { return callback(err); }
+        if (err) {
+          callback(err);
+          return;
+        }
         if (filterChildren(children).length == clientCount) {
           ready = true;
-          createReady(callback);
+          self._zku._zk.create(readyPath, null, zookeeper.CreateMode.EPHEMERAL, function(err) {
+            if (timeoutTimer) {
+              clearTimeout(timeoutTimer);
+            }
+            if (err) {
+              if (err.name !== 'NODE_EXISTS') {
+                return callback(err);
+              }
+            }
+            log.trace1('created ready node (doubleBarrier)');
+            callback(null, path);
+          });
         }
       });
     }
@@ -238,7 +241,7 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
       self._zku._zk.exists(readyPath, callback);
     }
     function register(callback) {
-      self._zku._zk.create(myPath, null, zookeeper.CreateMode.EPHEMERAL, callback);
+      self._zku._zk.create(myPath, null, zookeeper.CreateMode.EPHEMERAL_SEQUENTIAL, callback);
     }
     self._zku._zk.exists(readyPath, function(err, stat) {
       if (err) {
@@ -251,8 +254,8 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
         'pathExists': pathExists,
         'readyPath': ['pathExists', checkForReadyPath],
         'register': ['readyPath', register],
-        'internal': ['register', function(callback) {
-          internalEnter();
+        'internal': ['register', function(callback, status) {
+          internalEnter(status.register);
           callback();
         }]
       });
@@ -271,13 +274,14 @@ ZkOrca.prototype._doubleBarrierLeave = function(path, callback) {
       callback(err);
       return;
     }
-    self._zku._zk.exists(path, function(err, stat) {
-      if (err) {
-        callback(err);
-        return;
-      }
-      self._zku._zk.remove(path, -1, callback);
-    });
+    async.auto({
+      'exists': function(callback) {
+        self._zku._zk.exists(path, callback);
+      },
+      'remove': ['exists', function(callback) {
+        self._zku._zk.remove(path, -1, callback);
+      }]
+    }, callback);
   }
   self._zku.onConnection(onConnection);
 };
