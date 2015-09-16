@@ -67,10 +67,8 @@ test('test monitor zone change', function(t) {
     // reregister cxn.monitor(acId, mzId)
   });
   cxn.once(sprintf('monitor:%s:%s', acId, mzId), function() {
-    cxn._doubleBarrierEnter(genDoubleBarrierKey(), 1, -1, function() {
-      cxn.addNode(acId, mzId, agentId, uuid.v4(), function(err) {
-        t.ifError(err);
-      });
+    cxn.addNode(acId, mzId, agentId, uuid.v4(), function(err) {
+      t.ifError(err);
     });
   });
 });
