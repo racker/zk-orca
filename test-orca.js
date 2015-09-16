@@ -19,6 +19,8 @@ var async = require('async');
 var logmagic = require('logmagic');
 var longjohn = require('longjohn');
 var randomstring = require('randomstring');
+var sprintf = require('sprintf').sprintf;
+var uuid = require('uuid');
 var zkorca = require('./orca');
 var _ = require('underscore');
 
@@ -27,7 +29,7 @@ if (process.env.TRACE) {
 }
 
 var URLS = ['127.0.0.1:2181'];
-var BAD_URLS = ['127.0.0.1:666'];
+var BAD_URLS = ['127.0.0.1:6667'];
 var DEFAULT_NAME = 'nameA';
 
 if (process.env.ZOOKEEPER_PORT_2181_TCP_ADDR && process.env.ZOOKEEPER_PORT_2181_TCP_PORT) {
@@ -43,29 +45,35 @@ function defaultOptions() {
   }
 }
 
-//test('test monitor zone change', function(t) {
-//  var cxn = zkorca.getCxn(defaultOptions());
-//  cxn.monitor('acOne', 'testZone', function(err) {
-//    t.ifError(err);
-//  });
-//  cxn.on('error', function(err) {
-//    t.ifError(err);
-//  });
-//  cxn.on('zone:acOne:testZone', function(event) {
-//    console.log(event);
-//    t.end();
-//  });
-//  _.delay(function() {
-//    cxn.addNode('acOne', 'testZone', 'agentId1', 'guid', function(err) {
-//      t.ifError(err);
-//    });
-//  }, 100);
-//});
-
 function genDoubleBarrierKey(prefix) {
   prefix = prefix || 'double-barrier-';
   return '/' + prefix + randomstring.generate(8);
 }
+
+test('test monitor zone change', function(t) {
+  var cxn, acId, mzId, agentId;
+
+  acId = 'acOne';
+  mzId = 'testZone';
+  agentId = 'agentId1';
+
+  cxn = zkorca.getCxn(defaultOptions());
+  cxn.monitor(acId, mzId);
+  cxn.on('error', function(err) {
+    t.ifError(err);
+  });
+  cxn.on(sprintf('zone:%s:%s', acId, mzId), function() {
+    t.end();
+    // reregister cxn.monitor(acId, mzId)
+  });
+  cxn.once(sprintf('monitor:%s:%s', acId, mzId), function() {
+    cxn._doubleBarrierEnter(genDoubleBarrierKey(), 1, -1, function() {
+      cxn.addNode(acId, mzId, agentId, uuid.v4(), function(err) {
+        t.ifError(err);
+      });
+    });
+  });
+});
 
 test('double barrier (2 nodes, create sync)', function(t) {
   var cxn = zkorca.getCxn(defaultOptions()),

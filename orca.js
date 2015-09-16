@@ -110,10 +110,10 @@ util.inherits(ZkOrca, events.EventEmitter);
  * @param accountKey{String} the account key.
  * @param zoneName{String} the zone name.
  */
-ZkOrca.prototype.monitor = function(accountKey, zoneName, callback) {
+ZkOrca.prototype.monitor = function(accountKey, zoneName) {
   var self = this,
-      path = sprintf('/%s/%s/%s/connections', this._name, accountKey, zoneName);
-  self._zku.onConnection(function(err) {
+      path = sprintf('%s/connections', self._basePath(accountKey, zoneName));
+  function onConnection(err) {
     if (err) {
       log.trace1('Error while waiting for connection (monitor)', { err: err });
       callback(err);
@@ -121,24 +121,21 @@ ZkOrca.prototype.monitor = function(accountKey, zoneName, callback) {
     }
     async.auto({
       'path': function(callback) {
-         if (self._zku._cxnState !== self._zku.cxnStates.CONNECTED) {
-           log.trace1('Error observed on path creation', { error: err });
-           return;
-         }
-         try {
-           self._zku._zk.mkdirp(path, callback);
-         } catch (err) {
-           callback(err);
-         }
+        self._zku._zk.mkdirp(path, callback);
       },
       'watch': ['path', function(callback) {
         log.trace1('Starting watch', { accountKey: accountKey, zoneName: zoneName });
-        self._zku._zk.getChildren(path, function(event) {
-          self.emit('zone:' + accountKey + ':' + zoneName, event);
-        }, callback);
+        function watch(event) {
+          self.emit(sprintf('zone:%s:%s', accountKey, zoneName), event);
+        }
+        self._zku._zk.getChildren(path, watch, function(err) {
+          self.emit(sprintf('monitor:%s:%s', accountKey, zoneName));
+          callback(err);
+        });
       }]
     });
-  }, callback);
+  }
+  self._zku.onConnection(onConnection);
 };
 
 
@@ -157,19 +154,24 @@ ZkOrca.prototype._basePath = function(accountKey, zoneName) {
 ZkOrca.prototype.addNode = function(accountKey, zoneName, agentId, connGuid, callback) {
   var self = this,
       connPath = sprintf('%s/connections/%s-%s', self._basePath(accountKey, zoneName), agentId, connGuid);
-  self._zku.onConnection(function(err) {
+  function onConnection(err) {
     if (err) {
       log.trace1('Error while waiting for connection (monitor)', { err: err });
       callback(err);
       return;
     }
     async.auto({
-      'path': function(callback) {
-        log.trace1('Creating node', { path: connPath });
+      'mkdir': function(callback) {
+        self._zku._zk.mkdirp(path.dirname(connPath), callback);
+      },
+      'create': ['mkdir', function(callback) {
         self._zku._zk.create(connPath, null, zookeeper.CreateMode.EPHEMERAL, callback);
-      }
-    }, callback);
-  });
+      }]
+    }, function(err, results) {
+      callback(err, results);
+    });
+  }
+  self._zku.onConnection(onConnection);
 };
 
 
@@ -274,14 +276,7 @@ ZkOrca.prototype._doubleBarrierLeave = function(path, callback) {
       callback(err);
       return;
     }
-    async.auto({
-      'exists': function(callback) {
-        self._zku._zk.exists(path, callback);
-      },
-      'remove': ['exists', function(callback) {
-        self._zku._zk.remove(path, -1, callback);
-      }]
-    }, callback);
+    self._zku._zk.remove(path, -1, callback);
   }
   self._zku.onConnection(onConnection);
 };
