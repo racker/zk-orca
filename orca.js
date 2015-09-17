@@ -91,18 +91,30 @@ exports.shutdown = function shutdown(callback) {
 };
 
 
+/**
+ * Generate the zone ID for an account and zone.
+ * @param {String} accountId the account id.
+ * @param {String} zoneId the zone id.
+ * @returns {String} the id for monitors.
+ */
 exports.getZoneId = function getZoneId(accountId, zoneId) {
   return sprintf('zone:%s:%s', accountId, zoneId);
 };
 
 
-exports.getMonitorId = function getZoneId(accountId, zoneId) {
+/**
+ * Generate the event ID for an account and zone.
+ * @param {String} accountId the account id.
+ * @param {String} zoneId the zone id.
+ * @returns {String} the id for monitors.
+ */
+exports.getMonitorId = function getMonitorId(accountId, zoneId) {
   return sprintf('monitor:%s:%s', accountId, zoneId);
 };
 
 
 /**
- *
+ * Main Orcha Class.
  * @param opts
  * @constructor
  */
