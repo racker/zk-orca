@@ -73,7 +73,7 @@ exports.getCxn = function getCxn(opts) {
 
 
 /**
- *
+ * Shutdown all ZK clients.
  * @param callback
  */
 exports.shutdown = function shutdown(callback) {
@@ -88,6 +88,16 @@ exports.shutdown = function shutdown(callback) {
       callback(); // suppress the error on shutdown
     });
   }, callback);
+};
+
+
+exports.getZoneId = function getZoneId(accountId, zoneId) {
+  return sprintf('zone:%s:%s', accountId, zoneId);
+};
+
+
+exports.getMonitorId = function getZoneId(accountId, zoneId) {
+  return sprintf('monitor:%s:%s', accountId, zoneId);
 };
 
 
@@ -127,11 +137,11 @@ ZkOrca.prototype.monitor = function(accountKey, zoneName) {
       'watch': ['path', function(callback) {
         log.trace1('Starting watch', { accountKey: accountKey, zoneName: zoneName });
         function watch(event) {
-          self.emit(sprintf('zone:%s:%s', accountKey, zoneName), event);
+          self.emit(exports.getZoneId(accountKey, zoneName), event);
         }
         self._zku._zk.getChildren(path, watch, function(err) {
           if (!err) {
-            self.emit(sprintf('monitor:%s:%s', accountKey, zoneName));
+            self.emit(exports.getMonitorId(accountKey, zoneName));
           }
           callback(err);
         });

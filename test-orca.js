@@ -62,7 +62,7 @@ test('test monitor zone change', function(t) {
   cxn.on('error', function(err) {
     t.ifError(err, 'check for error');
   });
-  cxn.on(sprintf('zone:%s:%s', acId, mzId), function() {
+  cxn.on(zkorca.getZoneId(acId, mzId), function() {
     cxn.getConnections(acId, mzId, function(err, conns) {
       t.ok(conns[agentId].length == 1, 'check for one connection');
       cxn.isPrimary(acId, mzId, agentId, myPath, function(err, isPrimary) {
@@ -72,7 +72,7 @@ test('test monitor zone change', function(t) {
       });
     });
   });
-  cxn.once(sprintf('monitor:%s:%s', acId, mzId), function() {
+  cxn.once(zkorca.getMonitorId(acId, mzId), function() {
     cxn.addNode(acId, mzId, agentId, uuid.v4(), function(err, _myPath) {
       t.ifError(err, 'check for error');
       myPath = _myPath;
