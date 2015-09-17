@@ -184,7 +184,7 @@ ZkOrca.prototype._basePath = function(accountKey, zoneName) {
  */
 ZkOrca.prototype.addNode = function(accountKey, zoneName, agentId, connGuid, callback) {
   var self = this,
-      connPath = sprintf('%s/connections/%s%s%s', self._basePath(accountKey, zoneName), agentId, DELIMITER, connGuid);
+      connPath = sprintf('%s/connections/%s%s%s%s', self._basePath(accountKey, zoneName), agentId, DELIMITER, connGuid, DELIMITER);
   function onConnection(err) {
     if (err) {
       log.trace1('Error while waiting for connection (monitor)', { err: err });
@@ -196,7 +196,7 @@ ZkOrca.prototype.addNode = function(accountKey, zoneName, agentId, connGuid, cal
         self._zku._zk.mkdirp(path.dirname(connPath), callback);
       },
       'create': ['mkdir', function(callback) {
-        self._zku._zk.create(connPath, null, zookeeper.CreateMode.EPHEMERAL, callback);
+        self._zku._zk.create(connPath, null, zookeeper.CreateMode.EPHEMERAL_SEQUENTIAL, callback);
       }]
     }, function(err, results) {
       callback(err, results);
