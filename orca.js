@@ -276,14 +276,15 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
       readyPath = sprintf('%s/ready', barrierPath),
       myPath = sprintf('%s/%s-', barrierPath, uuid.v4()),
       ready = false,
-      timeoutTimer;
+      timeoutTimer,
+      doneCallback;
 
-  callback = _.once(callback);
+  doneCallback = _.once(callback);
 
   if (timeoutTimer > 0) {
     timeoutTimer = setTimeout(function() {
       ready = true;
-      callback(new TimeoutException());
+      doneCallback(new TimeoutException());
     }, timeout);
   }
 
@@ -302,34 +303,34 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
       return;
     }
     function internalEnter(path) {
-      function watcher(event) {
-        if (event.name === 'NODE_CHILDREN_CHANGED') {
-          _.delay(internalEnter.bind(self), 0, path);
-        }
-      }
+      var found;
       if (ready) {
         return;
       }
-      self._zku._zk.getChildren(barrierPath, watcher, function(err, children) {
-        if (err) {
-          callback(err);
-          return;
-        }
-        if (filterChildren(children).length == clientCount) {
-          ready = true;
-          self._zku._zk.create(readyPath, null, zookeeper.CreateMode.EPHEMERAL, function(err) {
+      async.auto({
+        'getChildren': function(callback) {
+          self._zku._zk.getChildren(barrierPath, function watcher(event) {
+            if (event.name === 'NODE_CHILDREN_CHANGED') {
+              _.delay(internalEnter.bind(self), 0, path);
+            }
+          }, callback);
+        },
+        'checkForChildren': ['getChildren', function(callback, results) {
+          var found = filterChildren(results.getChildren[0]).length == clientCount;
+          if (found) {
+            ready = true;
             if (timeoutTimer) {
               clearTimeout(timeoutTimer);
             }
-            if (err) {
-              if (err.name !== 'NODE_EXISTS') {
-                return callback(err);
-              }
-            }
-            log.trace1('created ready node (doubleBarrier)');
-            callback(null, path);
-          });
-        }
+            self._zku._zk.create(readyPath, null, zookeeper.CreateMode.EPHEMERAL, function(err) {
+              log.trace1('created ready node (doubleBarrier)');
+              callback(err);
+              doneCallback(null, path);
+            });
+          } else {
+            callback();
+          }
+        }]
       });
     }
     function pathExists(callback) {
