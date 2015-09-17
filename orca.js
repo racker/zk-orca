@@ -281,7 +281,7 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
 
   doneCallback = _.once(callback);
 
-  if (timeoutTimer > 0) {
+  if (timeout > 0) {
     timeoutTimer = setTimeout(function() {
       ready = true;
       doneCallback(new TimeoutException());

@@ -200,6 +200,18 @@ test('double barrier (random nodes [10-100], random)', function(t) {
   });
 });
 
+test('double barrier (timeout)', function(t) {
+  var barrierEntryCount = 3,
+      count = barrierEntryCount,
+      key = genDoubleBarrierKey(),
+      timeout = 100;
+  var cxn = zkorca.getCxn(defaultOptions());
+  cxn._doubleBarrierEnter(key, barrierEntryCount, timeout, function(err) {
+    t.ok(err instanceof zkorca.TimeoutException);
+    t.end();
+  });
+});
+
 test('double barrier leave', function(t) {
   var barrierEntryCount = 3,
       count = barrierEntryCount,
