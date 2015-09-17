@@ -170,6 +170,35 @@ ZkOrca.prototype.getConnections = function(accountKey, zoneName, callback) {
 };
 
 
+/**
+ * Is a path a primary connection.
+ * @param accountKey{String} the account key.
+ * @param zoneName{String} the zone name.
+ * @param agentId{String} the AgentID.
+ * @param myPath{String} The path of the connection.
+ * @param callback{Function} The callback (err, true/false);
+ */
+ZkOrca.prototype.isPrimary = function(accountKey, zoneName, agentId, myPath, callback) {
+  var self = this;
+  self.getConnections(accountKey, zoneName, function(err, conns) {
+    var connTuple, sorted, isPrimary;
+    if (err) {
+      callback(err);
+      return;
+    }
+    isPrimary = false;
+    connTuple = path.basename(myPath).split(DELIMITER);
+    if (conns[agentId] && conns[agentId].length > 0) {
+      sorted = _.sortBy(conns[agentId], function(conn) {
+        return conn.split(DELIMITER)[2];
+      });
+      isPrimary = sorted[0].lastIndexOf(connTuple[2]);
+    }
+    callback(null, isPrimary);
+  });
+};
+
+
 ZkOrca.prototype._basePath = function(accountKey, zoneName) {
   return sprintf('/%s/%s', accountKey, zoneName);
 };

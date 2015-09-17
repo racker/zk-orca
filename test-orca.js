@@ -51,7 +51,7 @@ function genDoubleBarrierKey(prefix) {
 }
 
 test('test monitor zone change', function(t) {
-  var cxn, acId, mzId, agentId;
+  var cxn, acId, mzId, agentId, myPath;
 
   acId = 'acOne';
   mzId = 'testZone2';
@@ -60,18 +60,22 @@ test('test monitor zone change', function(t) {
   cxn = zkorca.getCxn(defaultOptions());
   cxn.monitor(acId, mzId);
   cxn.on('error', function(err) {
-    t.ifError(err);
+    t.ifError(err, 'check for error');
   });
   cxn.on(sprintf('zone:%s:%s', acId, mzId), function() {
     cxn.getConnections(acId, mzId, function(err, conns) {
-      t.ok(conns[agentId].length == 1);
-      t.end();
+      t.ok(conns[agentId].length == 1, 'check for one connection');
+      cxn.isPrimary(acId, mzId, agentId, myPath, function(err, isPrimary) {
+        t.ifError(err, 'check for error');
+        t.ok(isPrimary, 'should be primary');
+        t.end();
+      });
     });
-    // reregister cxn.monitor(acId, mzId)
   });
   cxn.once(sprintf('monitor:%s:%s', acId, mzId), function() {
-    cxn.addNode(acId, mzId, agentId, uuid.v4(), function(err) {
-      t.ifError(err);
+    cxn.addNode(acId, mzId, agentId, uuid.v4(), function(err, _myPath) {
+      t.ifError(err, 'check for error');
+      myPath = _myPath;
     });
   });
 });
