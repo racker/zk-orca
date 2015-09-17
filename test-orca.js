@@ -54,7 +54,7 @@ test('test monitor zone change', function(t) {
   var cxn, acId, mzId, agentId;
 
   acId = 'acOne';
-  mzId = 'testZone';
+  mzId = 'testZone2';
   agentId = 'agentId1';
 
   cxn = zkorca.getCxn(defaultOptions());
@@ -63,7 +63,10 @@ test('test monitor zone change', function(t) {
     t.ifError(err);
   });
   cxn.on(sprintf('zone:%s:%s', acId, mzId), function() {
-    t.end();
+    cxn.getConnections(acId, mzId, function(err, conns) {
+      t.ok(conns.length == 1);
+      t.end();
+    });
     // reregister cxn.monitor(acId, mzId)
   });
   cxn.once(sprintf('monitor:%s:%s', acId, mzId), function() {

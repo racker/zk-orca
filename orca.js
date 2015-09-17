@@ -129,11 +129,33 @@ ZkOrca.prototype.monitor = function(accountKey, zoneName) {
           self.emit(sprintf('zone:%s:%s', accountKey, zoneName), event);
         }
         self._zku._zk.getChildren(path, watch, function(err) {
-          self.emit(sprintf('monitor:%s:%s', accountKey, zoneName));
+          if (!err) {
+            self.emit(sprintf('monitor:%s:%s', accountKey, zoneName));
+          }
           callback(err);
         });
       }]
     });
+  }
+  self._zku.onConnection(onConnection);
+};
+
+
+/**
+ * Get a subtree connections.
+ * @param accountKey{String} the account key.
+ * @param zoneName{String} the zone name.
+ */
+ZkOrca.prototype.getConnections = function(accountKey, zoneName, callback) {
+  var self = this,
+      path = sprintf('%s/connections', self._basePath(accountKey, zoneName));
+  function onConnection(err) {
+    if (err) {
+      log.trace1('Error while waiting for connection (monitor)', { err: err });
+      callback(err);
+      return;
+    }
+    self._zku._zk.getChildren(path, callback);
   }
   self._zku.onConnection(onConnection);
 };
