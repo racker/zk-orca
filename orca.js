@@ -238,8 +238,22 @@ ZkOrca.prototype.addNode = function(accountKey, zoneName, agentId, connGuid, cal
         self._zku._zk.create(connPath, null, zookeeper.CreateMode.EPHEMERAL_SEQUENTIAL, callback);
       }]
     }, function(err, results) {
-      callback(err, results);
+      callback(err, results.create);
     });
+  }
+  self._zku.onConnection(onConnection);
+};
+
+
+ZkOrca.prototype.removeNode = function(path, callback) {
+  var self = this;
+  function onConnection(err) {
+    if (err) {
+      log.trace1('Error while waiting for connection (monitor)', { err: err });
+      callback(err);
+      return;
+    }
+    self._zku._zk.remove(path, callback);
   }
   self._zku.onConnection(onConnection);
 };

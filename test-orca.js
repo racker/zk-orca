@@ -63,13 +63,23 @@ test('test monitor zone change', function(t) {
     t.ifError(err, 'check for error');
   });
   cxn.on(zkorca.getZoneId(acId, mzId), function() {
-    cxn.getConnections(acId, mzId, function(err, conns) {
-      t.ok(conns[agentId].length == 1, 'check for one connection');
-      cxn.isPrimary(acId, mzId, agentId, myPath, function(err, isPrimary) {
-        t.ifError(err, 'check for error');
-        t.ok(isPrimary, 'should be primary');
-        t.end();
-      });
+    async.auto({
+      'getConnections': function(callback) {
+         cxn.getConnections(acId, mzId, callback);
+      },
+      'validateConnections': ['getConnections', function(callback, results) {
+        t.ok(results.getConnections[agentId].length == 1, 'check for one connection');
+        _.delay(callback, 0);
+      }],
+      'isPrimary': ['validateConnections', function(callback, results) {
+        cxn.isPrimary(acId, mzId, agentId, myPath, callback);
+      }],
+      'remove': ['isPrimary', function(callback) {
+        cxn.removeNode(myPath, callback);
+      }]
+    }, function(err, results) {
+      t.ok(results.isPrimary, 'should be primary');
+      t.end();
     });
   });
   cxn.once(zkorca.getMonitorId(acId, mzId), function() {
