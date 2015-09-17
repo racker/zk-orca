@@ -64,7 +64,7 @@ test('test monitor zone change', function(t) {
   });
   cxn.on(sprintf('zone:%s:%s', acId, mzId), function() {
     cxn.getConnections(acId, mzId, function(err, conns) {
-      t.ok(conns.length == 1);
+      t.ok(conns[agentId].length == 1);
       t.end();
     });
     // reregister cxn.monitor(acId, mzId)

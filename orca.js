@@ -45,6 +45,7 @@ var zkUltra = require('zk-ultralight');
 var zookeeper = require('node-zookeeper-client');
 
 var DEFAULT_TIMEOUT = 16000;
+var DELIMITER = ':';
 var cxns = {}; // urls -> ZkCxn
 
 
@@ -155,7 +156,15 @@ ZkOrca.prototype.getConnections = function(accountKey, zoneName, callback) {
       callback(err);
       return;
     }
-    self._zku._zk.getChildren(path, callback);
+    self._zku._zk.getChildren(path, function(err, children) {
+      if (err) {
+        callback(err);
+        return;
+      }
+      callback(null, _.groupBy(children, function(child) {
+        return child.split(DELIMITER)[0];
+      }));
+    });
   }
   self._zku.onConnection(onConnection);
 };
@@ -175,7 +184,7 @@ ZkOrca.prototype._basePath = function(accountKey, zoneName) {
  */
 ZkOrca.prototype.addNode = function(accountKey, zoneName, agentId, connGuid, callback) {
   var self = this,
-      connPath = sprintf('%s/connections/%s-%s', self._basePath(accountKey, zoneName), agentId, connGuid);
+      connPath = sprintf('%s/connections/%s%s%s', self._basePath(accountKey, zoneName), agentId, DELIMITER, connGuid);
   function onConnection(err) {
     if (err) {
       log.trace1('Error while waiting for connection (monitor)', { err: err });
