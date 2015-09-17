@@ -29,7 +29,7 @@ var cxn = zkorca.getCxn(options);
 cxn.monitor('accountKey', 'zoneName')
 cxn.on('zone:accountKey:zoneName', onZoneChange);
 cxn.addNode('accountKey', 'zoneName', 'agentId', 'connection guid');
-cxn.removeNode('accountKey', 'zoneName', 'agentId', 'connection guid');
+cxn.removeNode(path);
 
 */
 
