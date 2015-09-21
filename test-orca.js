@@ -57,12 +57,11 @@ test('test monitor zone change', function(t) {
   mzId = 'testZone2';
   agentId = 'agentId1';
 
-  cxn = zkorca.getCxn(defaultOptions());
-  cxn.monitor(acId, mzId);
-  cxn.on('error', function(err) {
+  function onError(err) {
     t.ifError(err, 'check for error');
-  });
-  cxn.on(zkorca.getZoneId(acId, mzId), function() {
+  }
+
+  function onZoneId() {
     async.auto({
       'getConnections': function(callback) {
          cxn.getConnections(acId, mzId, callback);
@@ -81,13 +80,20 @@ test('test monitor zone change', function(t) {
       t.ok(results.isPrimary, 'should be primary');
       t.end();
     });
-  });
-  cxn.once(zkorca.getMonitorId(acId, mzId), function() {
+  }
+
+  function onMonitor() {
     cxn.addNode(acId, mzId, agentId, uuid.v4(), function(err, _myPath) {
       t.ifError(err, 'check for error');
       myPath = _myPath;
     });
-  });
+  }
+
+  cxn = zkorca.getCxn(defaultOptions());
+  cxn.monitor(acId, mzId);
+  cxn.on('error', onError);
+  cxn.on(zkorca.getZoneId(acId, mzId), onZoneId);
+  cxn.once(zkorca.getMonitorId(acId, mzId), onMonitor);
 });
 
 test('double barrier (2 nodes, create sync)', function(t) {
