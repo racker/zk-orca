@@ -214,7 +214,7 @@ ZkOrca.prototype.isPrimary = function(accountKey, zoneName, agentId, myPath, cal
       sorted = _.sortBy(conns[agentId], function(conn) {
         return conn.split(DELIMITER)[2];
       });
-      isPrimary = sorted[0].lastIndexOf(connTuple[2]);
+      isPrimary = sorted[0].lastIndexOf(connTuple[2]) > -1;
     }
     callback(null, isPrimary);
   });
