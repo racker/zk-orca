@@ -264,9 +264,6 @@ test('test monitor (add 3, remove 1)', function(t) {
   }
 
   function onZoneChange() {
-    function onZoneChange2() {
-      t.end();
-    }
     async.auto({
       'getConnections': function(callback) {
          cxn.getConnections(acId, mzId, callback);
@@ -277,7 +274,13 @@ test('test monitor (add 3, remove 1)', function(t) {
       }],
       'removeConnection': ['validateConnections', function(callback) {
         cxn.monitor(acId, mzId); // reregister
-        cxn.once(zkorca.getZoneId(acId, mzId), onZoneChange2);
+        cxn.once(zkorca.getZoneId(acId, mzId), function() {
+          cxn.getConnections(acId, mzId, function(err, conns) {
+            t.ifError(err);
+            t.ok(conns[agentId].length == 2, 'check for two connection');
+            t.end();
+          });
+        });
         _.delay(function() {
           cxn.removeNode(paths[0], callback);
         }, 10);
