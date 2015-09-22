@@ -210,8 +210,8 @@ test('double barrier (timeout)', function(t) {
   var barrierEntryCount = 3,
       count = barrierEntryCount,
       key = genDoubleBarrierKey(),
-      timeout = 100;
-  var cxn = zkorca.getCxn(defaultOptions());
+      timeout = 100,
+      cxn = zkorca.getCxn(defaultOptions());
   cxn._doubleBarrierEnter(key, barrierEntryCount, timeout, function(err) {
     t.ok(err instanceof zkorca.TimeoutException);
     t.end();
@@ -250,6 +250,59 @@ test('double barrier leave', function(t) {
       cxn._doubleBarrierLeave(path, done);
     });
   }, _.random(0, 20));
+});
+
+test('test monitor (add 3, remove 1)', function(t) {
+  var cxn,
+      acId = 'acOne',
+      mzId = 'testZone2' + randomstring.generate(4),
+      agentId = 'agentId1',
+      paths = [];
+
+  function onError(err) {
+    t.ifError(err, 'check for error');
+  }
+
+  function onZoneChange() {
+    function onZoneChange2() {
+      t.end();
+    }
+    async.auto({
+      'getConnections': function(callback) {
+         cxn.getConnections(acId, mzId, callback);
+      },
+      'validateConnections': ['getConnections', function(callback, results) {
+        t.ok(results.getConnections[agentId].length == 3, 'check for three connection');
+        callback();
+      }],
+      'removeConnection': ['validateConnections', function(callback) {
+        cxn.monitor(acId, mzId); // reregister
+        cxn.once(zkorca.getZoneId(acId, mzId), onZoneChange2);
+        _.delay(function() {
+          cxn.removeNode(paths[0], callback);
+        }, 10);
+      }]
+    }, function(err) {
+      t.ifError(err);
+    });
+  }
+
+  function onMonitor() {
+    function create(index, callback) {
+      cxn.addNode(acId, mzId, agentId, uuid.v4(), function(err, path) {
+        t.ifError(err, 'check for error');
+        paths.push(path);
+        callback();
+      });
+    }
+    async.times(3, create);
+  }
+
+  cxn = zkorca.getCxn(defaultOptions());
+  cxn.monitor(acId, mzId);
+  cxn.on('error', onError);
+  cxn.once(zkorca.getZoneId(acId, mzId), onZoneChange);
+  cxn.once(zkorca.getMonitorId(acId, mzId), onMonitor);
 });
 
 test('cleanup', function(t) {
