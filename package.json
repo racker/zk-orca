@@ -11,9 +11,9 @@
   ],
   "homepage": "",
   "scripts": {
-    "lint": "./node_modules/.bin/jshint ./orca.js",
+    "lint": "eslint orca.js test-orca.js",
     "test": "node ./test-orca.js",
-    "coverage": "./node_modules/.bin/istanbul cover test-orca.js"
+    "coverage": "istanbul cover test-orca.js"
   },
   "dependencies": {
     "async": "^1.4.2",
@@ -24,12 +24,15 @@
     "node-zookeeper-client": "^0.2.1",
     "sprintf": "^0.1.5",
     "underscore": "^1.8.3",
+    "uuid": "^2.0.1",
     "zk-ultralight": "^0.3.1"
   },
   "devDependencies": {
-    "tape": "4.2.0",
-    "jshint": "2.8.0",
-    "istanbul": ">= 0.1.37"
+    "eslint": "^1.4.1",
+    "istanbul": ">= 0.1.37",
+    "longjohn": "^0.2.8",
+    "randomstring": "^1.1.0",
+    "tape": "4.2.0"
   },
   "engines": {
     "node": ">= 0.10.31"
