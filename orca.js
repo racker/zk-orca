@@ -222,7 +222,7 @@ ZkOrca.prototype.isPrimary = function(accountKey, zoneName, agentId, myPath, cal
 
 
 ZkOrca.prototype._basePath = function(accountKey, zoneName) {
-  return sprintf('/%s/%s', accountKey, zoneName);
+  return sprintf('/%s/%s/%s', this._name, accountKey, zoneName);
 };
 
 
@@ -308,21 +308,21 @@ ZkOrca.prototype._doubleBarrierEnter = function(barrierPath, clientCount, timeou
         return;
       }
       async.auto({
-        'getChildren': function(callback) {
+        'getChildren': function (callback) {
           self._zku._zk.getChildren(barrierPath, function watcher(event) {
             if (event.name === 'NODE_CHILDREN_CHANGED') {
               _.delay(internalEnter.bind(self), 0, path);
             }
           }, callback);
         },
-        'checkForChildren': ['getChildren', function(callback, results) {
+        'checkForChildren': ['getChildren', function (callback, results) {
           var found = filterChildren(results.getChildren[0]).length == clientCount;
           if (found) {
             ready = true;
             if (timeoutTimer) {
               clearTimeout(timeoutTimer);
             }
-            self._zku._zk.create(readyPath, null, zookeeper.CreateMode.EPHEMERAL, function(err) {
+            self._zku._zk.create(readyPath, null, zookeeper.CreateMode.EPHEMERAL, function (err) {
               log.trace1('created ready node (doubleBarrier)');
               callback(err);
               doneCallback(null, path);
