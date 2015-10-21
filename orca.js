@@ -380,6 +380,278 @@ ZkOrca.prototype._doubleBarrierLeave = function(path, callback) {
 
 
 /**
+ * Atomically decrement and return a long.
+ * @param {String} name A zookeeper path.
+ * @param {String} txnId A transaction ID.
+ * @param {Function} callback A callback called with (err, value);
+ */
+ZkOrca.prototype.decrementAndGet = function(name, txnId, callback) {
+  this.decrementAndGetBy(name, 1, txnId, callback);
+};
+
+
+/**
+ * Atomically decrement a long by a certain value and return it.
+ * @param {String} name A zookeeper path.
+ * @param {Number} value A integer value by which to decrease the long.
+ * @param {String} txnId A transaction ID.
+ * @param {Function} callback A callback called with (err, value);
+ */
+ZkOrca.prototype.decrementAndGetBy = function(name, value, txnId, callback) {
+  this.incrementAndGetBy(name, (-value), txnId, callback);
+};
+
+
+/**
+ * Atomically increment and return a long.
+ * @param {String} name A zookeeper path.
+ * @param {String} txnId A transaction ID.
+ * @param {Function} callback A callback called with (err, value);
+ */
+ZkOrca.prototype.incrementAndGet = function(name, txnId, callback) {
+  this.incrementAndGetBy(name, 1, txnId, callback);
+};
+
+
+/**
+ * Atomically increment a long by a certain value and return it.
+ * @param {String} name A zookeeper path.
+ * @param {Number} value A integer value by which to increase the long.
+ * @param {String} txnId A transaction ID.
+ * @param {Function} callback A callback called with (err, value);
+ */
+ZkOrca.prototype.incrementAndGetBy = function(name, value, txnId, callback) {
+  var self = this,
+      dataFilename, lockFilename;
+
+  if (name[name.length - 1] === '/') {
+    callback(new Error('Path name may not end in \'/\''));
+    return;
+  }
+
+  dataFilename = path.join('/', self._name, 'data', name);
+  lockFilename = path.join('/', self._name, 'locks', name);
+
+  function addUnlockToCallback(callback) {
+    return function() {
+      var args = arguments;
+
+      self._zku.unlock(lockFilename, function(err) {
+        if (err) {
+          log.error('Failed to unlock.', {txnId: txnId, err: err, lockName: lockFilename});
+        } else {
+          log.debug('Lock unlocked.', {txnId: txnId, lockName: lockFilename});
+        }
+        callback.apply(null, args);
+      });
+    };
+  }
+
+  callback = addUnlockToCallback(callback);
+  callback = (function(callback) {
+    var timerId = setTimeout(function onconnectTimeout() {
+      var error = new Error("Timed out after " + self._timeout);
+      callback(error);
+    }, self._timeout);
+    return function(err) {
+      if (err) {
+        log.trace1('Error while waiting for connection', { err: err });
+      }
+      clearTimeout(timerId);
+      callback.apply(null, arguments);
+    };
+  })(callback);
+  callback = _.once(callback);
+
+
+  function onConnection(err) {
+    if (err) {
+      log.trace1('Error while waiting for connection (incrementAndGetBy)', {err: err});
+      callback(err);
+      return;
+    }
+
+    async.auto({
+      lock: function(callback) {
+        self._zku.lock(lockFilename, txnId, function(err) {
+          callback(err);
+        });
+      },
+
+      exists: ['lock', function(callback) {
+        self._zku._zk.exists(dataFilename, callback);
+      }],
+
+      mkdir: ['exists', function(callback, result) {
+        var exists = result.exists;
+
+        if (exists) {
+          callback();
+          return;
+        }
+
+        self._zku._zk.mkdirp(path.dirname(dataFilename), callback);
+      }],
+
+      getData: ['mkdir', function(callback) {
+        self._zku._zk.getData(dataFilename, null, function(err, data, stat) {
+          if (err) {
+            data = 0;
+            self._zku._zk.create(dataFilename, new Buffer('' + data), function(err) {
+              if (err) {
+                callback(err);
+                return;
+              }
+              callback(null, data);
+            });
+            return;
+          }
+
+          data = data ? parseInt(data.toString(), 10) : 0;
+          callback(null, data);
+        });
+      }],
+
+      setData: ['getData', function(callback, result) {
+        var data = result.getData,
+            newValue;
+
+        if (!data) {
+          data = 0;
+        }
+
+        newValue = data + value;
+        self._zku._zk.setData(dataFilename, new Buffer('' + newValue), -1, function(err, stat) {
+          if (err) {
+            callback(err);
+            return;
+          }
+
+          callback(null, newValue);
+        });
+      }]
+    }, function(err, result) {
+      callback(err, result.setData);
+    });
+  }
+
+  self._zku.onConnection(onConnection);
+};
+
+
+/**
+ * Get the specified long.
+ * @param {String} name A zookeeper path.
+ * @param {Number?} value An optional value to default to if the long has not yet been instantiated. If provided,
+ * this function will attempt to initialize the value, otherwise it will error if the value at the path has not been
+ * instantiated previously.
+ * @param {Function} callback A callback called with (err, value);
+ */
+ZkOrca.prototype.get = function(name, value, callback) {
+  var self = this,
+      dataFilename;
+
+  if (name[name.length - 1] === '/') {
+    callback(new Error('Path name may not end in \'/\''));
+    return;
+  }
+
+  if (!callback && typeof value === 'function') {
+    callback = value;
+    value = null;
+  }
+
+  dataFilename = path.join('/', self._name, 'data', name);
+
+  function onConnectionNoValue(err) {
+    if (err) {
+      log.trace1('Error while waiting for connection (get)', {err: err});
+      callback(err);
+      return;
+    }
+
+    self._zku._zk.getData(dataFilename, null, function(err, data, stat) {
+      if (err) {
+        callback(err);
+        return;
+      }
+
+      data = data ? parseInt(data.toString(), 10) : 0;
+
+      callback(null, data);
+    });
+  }
+
+  function onConnectionValue(err) {
+    if (err) {
+      log.trace1('Error while waiting for connection (get)', {err: err});
+      callback(err);
+      return;
+    }
+
+    async.auto({
+      getData: function(callback) {
+        self._zku._zk.getData(dataFilename, null, function(err, data, stat) {
+          if (err) {
+            callback(null, false);
+            return;
+          }
+
+          data = data ? parseInt(data.toString(), 10) : 0;
+
+          callback(null, data);
+        });
+      },
+
+      mkdir: ['getData', function(callback, result) {
+        var getDataSuccess = result.getData;
+
+        if (getDataSuccess) {
+          callback();
+          return;
+        }
+
+        self._zku._zk.mkdirp(path.dirname(dataFilename), callback);
+      }],
+
+      create: ['mkdir', function(callback, result) {
+        var getDataSuccess = result.getData;
+
+        if (getDataSuccess) {
+          callback();
+          return;
+        }
+
+        self._zku._zk.create(dataFilename, new Buffer('' + value), function(err) {
+          if (err) {
+            callback(err);
+            return;
+          }
+
+          callback(null, value);
+        });
+      }]
+    }, function(err, result) {
+      var data;
+
+      if (err) {
+        callback(err);
+        return;
+      }
+
+      data = result.getData || result.create;
+
+      callback(null, data);
+    });
+
+
+  }
+
+  self._zku.onConnection(value !== null && value !== undefined ? onConnectionValue : onConnectionNoValue);
+};
+
+
+/**
  *
  * @param callback
  */

@@ -22,5 +22,6 @@ docker-compose start zookeeper
 Run tests:
 
 ```
+npm install
 make test
 ```

@@ -308,6 +308,284 @@ test('test monitor (add 3, remove 1)', function(t) {
   cxn.once(zkorca.getMonitorId(acId, mzId), onMonitor);
 });
 
+
+test('get long', function(t) {
+  var path = '/bar-' + randomstring.generate(8) ,
+      cxn;
+
+  cxn = zkorca.getCxn(defaultOptions());
+
+  async.auto({
+    get: function(callback) {
+      cxn.get(path, function(err, data) {
+        t.ok(err, 'Cannot get a value before it has been instantiated');
+        callback();
+      });
+    },
+
+    set: ['get', function(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', function(err, value) {
+        t.error(err, 'Should not error when incrementing a long');
+        t.equal(value, 1, 'This value was just created and incremented, so should be 1');
+        callback();
+      });
+    }],
+
+    getAgain: ['set', function(callback) {
+      cxn.get(path, function(err, data) {
+        t.error(err, 'Should not error when getting the instantiated long');
+        t.equal(data, 1, 'Value should still be 1');
+        callback();
+      });
+    }]
+  }, function(err) {
+    t.error(err);
+    t.end();
+  });
+});
+
+
+test('get long initialize value zero', function(t) {
+  var path = '/bar-' + randomstring.generate(8) ,
+      cxn;
+
+  cxn = zkorca.getCxn(defaultOptions());
+
+  async.auto({
+    get: function(callback) {
+      cxn.get(path, 0, function(err, data) {
+        t.error(err, 'We should not error because we provided an initial value');
+        t.equal(data, 0, 'The value should be equal to what we initialized it to');
+        callback();
+      });
+    },
+
+    set: ['get', function(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', function(err, value) {
+        t.error(err, 'Should not error when incrementing a long');
+        t.equal(value, 1, 'This value was just created and incremented, so should be 1');
+        callback();
+      });
+    }],
+
+    getAgain: ['set', function(callback) {
+      cxn.get(path, function(err, data) {
+        t.error(err, 'Should not error when getting the instantiated long');
+        t.equal(data, 1, 'Value should still be 1');
+        callback();
+      });
+    }],
+
+    getAgain2: ['getAgain', function(callback) {
+      cxn.get(path, 0, function(err, data) {
+        t.error(err, 'Should not error when getting the instantiated long');
+        t.equal(data, 1, 'Value should still be 1');
+        callback();
+      });
+    }]
+  }, function(err) {
+    t.error(err);
+    t.end();
+  });
+});
+
+
+test('get long initialize value non-zero', function(t) {
+  var path = '/bar-' + randomstring.generate(8) ,
+    cxn;
+
+  cxn = zkorca.getCxn(defaultOptions());
+
+  async.auto({
+    get: function(callback) {
+      cxn.get(path, 1, function(err, data) {
+        t.error(err, 'We should not error because we provided an initial value');
+        t.ok(data, 'A value should be returned');
+        t.equal(data, 1, 'The value should be equal to what we initialized it to');
+        callback();
+      });
+    },
+
+    set: ['get', function(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', function(err, value) {
+        t.error(err, 'Should not error when incrementing a long');
+        t.equal(value, 2, 'This value was just created and incremented, so should be 1');
+        callback();
+      });
+    }],
+
+    getAgain: ['set', function(callback) {
+      cxn.get(path, function(err, data) {
+        t.error(err, 'Should not error when getting the instantiated long');
+        t.equal(data, 2, 'Value should still be 1');
+        callback();
+      });
+    }],
+
+    getAgain2: ['getAgain', function(callback) {
+      cxn.get(path, 1, function(err, data) {
+        t.error(err, 'Should not error when getting the instantiated long');
+        t.equal(data, 2, 'Value should still be 1');
+        callback();
+      });
+    }]
+  }, function(err) {
+    t.error(err);
+    t.end();
+  });
+});
+
+
+test('increment long', function(t) {
+  var path = '/bar-' + randomstring.generate(8) ,
+      cxn;
+
+  cxn = zkorca.getCxn(defaultOptions());
+  cxn.incrementAndGet(path, 'test-txn-id', function(err, data) {
+    t.error(err, 'Should be able to increment a long');
+    t.ok(data, 'A value should be returned');
+    t.equal(data, 1, 'The value should be equal to 1 since it was just created and incremented');
+    t.end();
+  });
+});
+
+test('increment long parallel', function(t) {
+  var path = '/bar-' + randomstring.generate(8),
+      cxn;
+
+  cxn = zkorca.getCxn(defaultOptions());
+
+  async.parallel([
+    function increment1(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', callback);
+    },
+    function increment2(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', callback);
+    },
+    function increment3(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', callback);
+    }
+  ], function(err, results) {
+    var actual = results.sort(),
+        expected = [1, 2, 3];
+
+    t.error(err, 'Should not error while incrementing long 3 times');
+    t.deepEqual(actual, expected, 'We should see each of 1, 2, 3 exactly once');
+    t.end();
+  });
+});
+
+test('increment long parallel sub-dir', function(t) {
+  var path = '/bar/foo-' + randomstring.generate(8),
+      cxn;
+
+  cxn = zkorca.getCxn(defaultOptions());
+
+  async.parallel([
+    function increment1(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', callback);
+    },
+    function increment2(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', callback);
+    },
+    function increment3(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', callback);
+    }
+  ], function(err, results) {
+    var actual = results.sort(),
+      expected = [1, 2, 3];
+
+    t.error(err, 'Should not error while incrementing long 3 times');
+    t.deepEqual(actual, expected, 'We should see each of 1, 2, 3 exactly once');
+    t.end();
+  });
+});
+
+
+test('increment by', function(t) {
+  var path = '/bar-' + randomstring.generate(8),
+      cxn;
+
+  cxn = zkorca.getCxn(defaultOptions());
+  cxn.incrementAndGetBy(path, 5, 'test-txn-id', function(err, value) {
+    t.error(err, 'Should not error while incrementing a long by a value');
+    t.ok(value);
+    t.equal(value, 5, 'We incremented the value by 5, so it should be 5');
+    t.end();
+  });
+});
+
+
+test('decrement by', function(t) {
+  var path = '/bar-' + randomstring.generate(8),
+      cxn;
+
+  cxn = zkorca.getCxn(defaultOptions());
+  cxn.decrementAndGetBy(path, 5, 'test-txn-id', function(err, value) {
+    t.error(err, 'Should not error while decrementing a long by a value');
+    t.ok(value);
+    t.equal(value, -5, 'We decremented the value by 5, so it should be -5');
+    t.end();
+  });
+});
+
+test('increment and decrement long', function(t) {
+  var path = '/bar-' + randomstring.generate(8),
+      cxn;
+
+  cxn = zkorca.getCxn(defaultOptions());
+
+  async.auto({
+    increment1: function(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', callback);
+    },
+
+    increment2: function(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', callback);
+    },
+
+    increment3: function(callback) {
+      cxn.incrementAndGet(path, 'test-txn-id', callback);
+    },
+
+    decrement1: ['increment1', function(callback) {
+      cxn.decrementAndGet(path, 'test-txn-id', callback);
+    }],
+
+    decrement2: ['increment2', function(callback) {
+      cxn.decrementAndGet(path, 'test-txn-id', callback);
+    }],
+
+    decrement3: ['increment3', function(callback) {
+      cxn.decrementAndGet(path, 'test-txn-id', callback);
+    }],
+
+    get: ['decrement1', 'decrement2', 'decrement3', function(callback) {
+      cxn.get(path, function(err, data) {
+        t.error(err, 'Should not error while incrementing and decrementing long');
+        t.equal(data, 0, 'Should be 0 after being incremented and decremented 3 times each');
+        callback();
+      });
+    }]
+  }, function(err) {
+    t.error(err);
+    t.end();
+  });
+});
+
+test('bad path name', function(t) {
+  var path = '/bar/',
+      cxn;
+
+  cxn = zkorca.getCxn(defaultOptions());
+  cxn.incrementAndGet(path, 'test-txn-id', function(err) {
+    t.ok(err, 'Should not be able to use a path that ends with a /');
+    t.equal(err.message, 'Path name may not end in \'/\'');
+    t.end();
+  });
+
+});
+
 test('cleanup', function(t) {
   zkorca.shutdown(function() {
     t.end();
